@@ -1,7 +1,8 @@
 # 「（1人で遊べる）VSオセロ」CUI
 プレイヤー先行で1人でオセロができるC言語で書かれたCUIプログラムです．
 
-![scene.png](/scene.png)
+<img src="scene.png" width="250">
+
 
 <h1>遊び方</h1>
 
