@@ -144,20 +144,14 @@ int othelloAI(void)
     int x = 0;
     t = &x;
     int ans;
+    int rest_mass=20;//深さ優先探索アルゴリズムに切り替える時の残りマス
     
-    if (E_cnt() <= 20)
+    if (E_cnt() <= rest_mass)
     {
         int mass[100][SIZE][SIZE];
         memcpy(mass[*t], c_mas2, sizeof(mass[*t]));
         ans = othello_AI_check1(t, mass);
-    }
-    /*else if (E_cnt() <= 36)
-     {
-     int mass[100][SIZE][SIZE];
-     memcpy(mass[*t], c_mas2, sizeof(mass[*t]));
-     ans = othello_AI_check2(t, mass);
-     }*/
-    else
+    }else
     {
         for (int i = 0; i < gl_delete_count; i++)
         {
@@ -175,39 +169,6 @@ int othelloAI(void)
             plus_count[i] = mkcount[i] + okcount[i];
             //printf("%d:%d + %d==%d\n", i, mkcount[i], okcount[i], plus_count[i]);
         }
-        /*int min = 100;
-         for (int i = 0; i < ans; i++)
-         {
-         if (min > okcount[i])
-         {
-         min = okcount[i];
-         }
-         }
-         int exc=10;
-         int a = 0;
-         int junnbann[20];
-         for (int i = 0; i < ans; i++)
-         {
-         if (min == okcount[i])
-         {
-         if (exc >= mkcount[i])
-         {
-         exc = mkcount[i];
-         junnbann[a] = i;
-         a++;
-         }
-         }
-         }
-         int point = 0;
-         int mk_num =0;
-         for (int i = 0; i < a; i++)
-         {
-         exc=mas_evaluation(junnbann[i]);
-         if(point<=exc){
-         point=exc;
-         mk_num=junnbann[i];
-         }
-         }*/
         int k = 0;
         int ult[20] = {0};
         int count = 0;
@@ -470,7 +431,6 @@ int othello_AI_check3(int *ar_turn, int mass[20][SIZE][SIZE], int mkcount[], int
                             calculationai(mass[*ar_turn + 1]);
                             if (W_cnt_AI(mass[*ar_turn + 1]) == 0)
                             {
-                                printf("lkjh");
                                 okcount[eva_count[0]] += 30;
                             }
                             if (kaihoudo(j, i, mass[*ar_turn]) <= 1)
