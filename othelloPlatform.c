@@ -8,7 +8,6 @@
 
 
 #define BOARD_SIZE 8
-#define SIZE 10
 #define EMPTY -1
 #define BLACK 0
 #define WHITE 1
@@ -28,6 +27,7 @@ bool isOutBoard();
 bool isEndGame();
 void displayBoard();
 void setDisc();
+void putDiscToBoard();
 void displayResult();
 
 struct turn{
@@ -299,6 +299,13 @@ void setDisc(struct board *bd, int disc, struct turn *_turn){
         printf("コンピュータは(%d, %d)に置きました\n", x + 1, y + 1);
     }
 
+    putDiscToBoard(disc, &bd, x, y);
+
+    printf("黒石:%d, 白石:%d\n", bd->blackDiscCnt, bd->whiteDiscCnt);
+
+}
+
+void putDiscToBoard(int disc,struct board *bd, int x, int y){
     bd->board[y][x] = disc;
     if(disc == BLACK)bd->blackDiscCnt++;
     else bd->whiteDiscCnt++;
@@ -309,15 +316,15 @@ void setDisc(struct board *bd, int disc, struct turn *_turn){
         for(int j = 1; j < BOARD_SIZE; j++){
             sy += dy[i], sx += dx[i];
             if(isOutBoard(sy, sx))break;
-            if(bd->board[sy][sx] ==EMPTY || bd->board[sy][sx] == GUIDE)break;
+            if(bd->board[sy][sx] == EMPTY || bd->board[sy][sx] == GUIDE)break;
 
             if(bd->board[sy][sx] == disc){
                 for(int k = j; k > 1; k--){
                     sy -= dy[i], sx -= dx[i];
                     bd->board[sy][sx] = disc;
                     if(disc == BLACK){
-                        bd->blackDiscCnt++;                        bd->whiteDiscCnt--;
-
+                        bd->blackDiscCnt++;
+                        bd->whiteDiscCnt--;
                     }else{
                         bd->whiteDiscCnt++;
                         bd->blackDiscCnt--;
@@ -327,8 +334,6 @@ void setDisc(struct board *bd, int disc, struct turn *_turn){
             }
         }
     }
-    printf("黒石:%d, 白石:%d\n", bd->blackDiscCnt, bd->whiteDiscCnt);
-
 }
 
 void displayResult(int myDisc, struct board *bd){
@@ -346,5 +351,3 @@ void displayResult(int myDisc, struct board *bd){
     }
 
 }
-
-// void opponentAI(){}
