@@ -14,9 +14,25 @@
 #define GUIDE 5
 
 #define DIRECTION_SIZE 8
-#define INPUT_SIZE 50
+#define INPUT_SIZE 30
 #define SLEEP_TIME 0.5 * 1000000
 
+// Search
+// 20がおそらく限界
+#define REST_BOARD_TO_SWITCH_Search 16
+#define WIN 2
+#define DRAW 1
+#define LOSE 0
+
+//何手先まで読むか
+#define FUTURE_MOVE_COUNT 6
+
+int opponentSearch();
+int canPutCorner();
+int searchNotLose();
+void displaySearchResult();
+int searchCanPutDiscCnt();
+// Search
 
 void displayGameExplanation();
 void play();
@@ -27,7 +43,7 @@ bool isOutBoard();
 bool isEndGame();
 void displayBoard();
 void setDisc();
-void putDiscToBoard();
+void putDiscOnBoard();
 void displayResult();
 
 struct turn{
@@ -194,9 +210,9 @@ bool isEndGame(struct board *bd){
             bd->isAlreadySkiped = true;
             return false;
         }
-        printf("両者置けないため");
+        // printf("両者置けないため");
     }
-    printf("試合終了\n");
+    // printf("試合終了\n");
 
     return true;
 }
@@ -260,7 +276,7 @@ void setDisc(struct board *bd, int disc, struct turn *_turn){
         }
         printf("\n");
 
-        // // コンピュータ入力（デバッグ用）
+        //敵がコマをランダムに置く(デバッグ用)
         // int canPutSize=0;
         // int X[30],Y[30];
         // for(int i = 0; i < BOARD_SIZE; i++){
@@ -275,37 +291,32 @@ void setDisc(struct board *bd, int disc, struct turn *_turn){
         // srand(time(NULL));
         // int num = rand() % canPutSize;
         // x = X[num], y = Y[num];
+
+        // 敵がコマを探索結果で置く(デバッグ用)
+        // struct board sBd = *bd;
+        // int coordinate = opponentSearch(&sBd,disc);
+        // x = coordinate / 10;
+        // y = coordinate % 10;
+        // printf("\n");
+        // printf("コンピュータは(%d, %d)に置きました\n", x + 1, y + 1);
     }else{
         //敵がコマを置く
-        // opponentAI();
-
-        // コンピュータ入力（デバッグ用）
-        int canPutSize=0;
-        int X[30],Y[30];
-        for(int i = 0; i < BOARD_SIZE; i++){
-            for(int j = 0; j < BOARD_SIZE; j++){
-                if(bd->board[i][j]==GUIDE){
-                    X[canPutSize]=j;
-                    Y[canPutSize]=i;
-                    canPutSize++;
-                }
-            }
-        }
-        srand(time(NULL));
-        int num = rand() % canPutSize;
-        x = X[num], y = Y[num];
+        struct board sBd = *bd;
+        int coordinate = opponentSearch(&sBd,disc);
+        x = coordinate / 10;
+        y = coordinate % 10;
 
         printf("\n");
         printf("コンピュータは(%d, %d)に置きました\n", x + 1, y + 1);
     }
 
-    putDiscToBoard(disc, &bd, x, y);
+    putDiscOnBoard(disc, bd, x, y);
 
     printf("黒石:%d, 白石:%d\n", bd->blackDiscCnt, bd->whiteDiscCnt);
 
 }
 
-void putDiscToBoard(int disc,struct board *bd, int x, int y){
+void putDiscOnBoard(int disc,struct board *bd, int x, int y){
     bd->board[y][x] = disc;
     if(disc == BLACK)bd->blackDiscCnt++;
     else bd->whiteDiscCnt++;
@@ -350,4 +361,162 @@ void displayResult(int myDisc, struct board *bd){
         printf("引き分け\n");
     }
 
+}
+
+
+//TODO: 過去探索した盤面の再利用
+int opponentSearch(struct board *bd, int disc){
+    int depth = 0;
+
+    int corner = canPutCorner(bd);
+    if(corner >= 0)return corner;
+
+    // true: DFS(depth-first search），
+    // false:  REST_BOARD_TO_SWITCH_Search手先の相手が置ける石の数の最大値が最小 + (開放度理論)
+    if(BOARD_SIZE * BOARD_SIZE - (bd->blackDiscCnt + bd->whiteDiscCnt) <= REST_BOARD_TO_SWITCH_Search){
+        printf("深さ優先探索モード\n");
+        return searchNotLose(bd, disc, depth);
+    }else{
+        // pass by value
+        return searchCanPutDiscCnt(bd, disc, depth);
+    }
+}
+
+int searchNotLose(struct board *bd, int myDisc, int depth){
+    depth ++;
+    // 全マス埋まったときの処理
+    if(isEndGame(bd)){
+        if(myDisc == BLACK){
+            if(bd->blackDiscCnt > bd->whiteDiscCnt)return WIN;
+            else if(bd->blackDiscCnt < bd->whiteDiscCnt)return LOSE;
+            else return DRAW;
+        }else{
+            if(bd->whiteDiscCnt > bd->blackDiscCnt)return WIN;
+            else if(bd->whiteDiscCnt < bd->blackDiscCnt)return LOSE;
+            else return DRAW;
+        }
+    }
+
+    int disc = (depth % 2 == 1 ? myDisc:!myDisc);
+    // skipした場合一つターンを飛ばす
+    if(bd->guideCnt == 0){
+        depth++;
+        disc = (depth % 2 == 1 ? myDisc:!myDisc);
+        addCanPutGuide(disc, bd);
+        // displayBoard(bd);
+    }
+    // skipしたがターンが移った先でも置けない場合は終了
+    if(isEndGame(bd)){
+        if(myDisc == BLACK){
+            if(bd->blackDiscCnt > bd->whiteDiscCnt)return WIN;
+            else if(bd->blackDiscCnt < bd->whiteDiscCnt)return LOSE;
+            else return DRAW;
+        }else{
+            if(bd->whiteDiscCnt > bd->blackDiscCnt)return WIN;
+            else if(bd->whiteDiscCnt < bd->blackDiscCnt)return LOSE;
+            else return DRAW;
+        }
+    }
+
+    int myAttackRes = -1, opponentAttackRes=10;
+    int notLoseX = 0, notLoseY = 0;
+    int asdf=0;
+    for(int i = 0; i < BOARD_SIZE; i++){
+        for(int j = 0; j < BOARD_SIZE; j++){
+            if(bd->board[i][j] == GUIDE){
+                // asdf++;
+                struct board sBd = *bd;
+                putDiscOnBoard(disc, &sBd, j, i);
+                addCanPutGuide(!disc, &sBd);
+                // displayBoard(&sBd);
+                int tempResult = searchNotLose(&sBd, myDisc, depth);
+                if(disc == myDisc){
+                    //WIN→DRAW→LOSEの優先度で返す
+                    if(myAttackRes < tempResult){
+                        myAttackRes = tempResult;
+                        notLoseX = j, notLoseY = i;
+                        asdf++;
+                    }
+                    if(myAttackRes == WIN){
+                        if(depth == 1){
+                            displaySearchResult(myAttackRes);
+                            return 10 * notLoseX + notLoseY;
+                        }
+                        return myAttackRes;
+                    }
+                }else{
+                    //LOSE→DRAW→WINの優先度で返す
+                    if(opponentAttackRes > tempResult)opponentAttackRes = tempResult;
+                    if(opponentAttackRes == LOSE)return opponentAttackRes;
+                }
+            }
+        }
+        // asdf++;
+    }
+
+    if(depth == 1){
+        displayBoard(bd);
+        displaySearchResult(myAttackRes);
+        return 10 * notLoseX + notLoseY;
+    }
+
+    if(disc == myDisc)return myAttackRes;
+    else return opponentAttackRes;
+}
+
+void displaySearchResult(int res){
+    if(res == WIN)printf("予測：コンピュータの勝ち\n");
+    else if(res == LOSE)printf("予測：コンピュータの負け\n");
+    else printf("予測：引き分け\n");
+}
+
+int searchCanPutDiscCnt(struct board *bd,int myDisc, int depth){
+    depth ++;
+    if(depth == FUTURE_MOVE_COUNT){
+        return bd->guideCnt;
+    }
+
+    int whenMinX,whenMinY;
+    int min =1000;
+    for(int i = 0; i < BOARD_SIZE; i++){
+        for(int j = 0; j < BOARD_SIZE; j++){
+            if(bd->board[i][j] == GUIDE){
+                int disc = (depth % 2 == 1 ? myDisc:!myDisc);
+
+                struct board sBd = *bd;
+                putDiscOnBoard(disc, &sBd, j, i);
+                addCanPutGuide(!disc, &sBd);
+                int tempMinGuideCnt = searchCanPutDiscCnt(&sBd, myDisc, depth);
+                if(tempMinGuideCnt <= min){
+                    min = tempMinGuideCnt;
+                    whenMinX = j, whenMinY = i;
+                }
+            }
+        }
+    }
+
+    if(depth == 1){
+        //TODO:①角優先的に置く
+        //TODO:角の周辺の優先度を下げる
+        /*NOTE: 各min, whenMinX,whenMinYを配列で保存．
+            - minで昇順ソート
+            - 値が同じだが，角周辺を避ける
+
+            ＋α 探索時も角優先で探索し，処理時間・メモリの軽減
+        */
+        return 10 * whenMinX + whenMinY;
+    }
+    if(depth % 2 == 0 && min == 1000)return bd->guideCnt;
+
+    return min;
+
+}
+
+int canPutCorner(struct board *bd){
+    if(bd->board[0][0] == GUIDE)return 0;
+    if(bd->board[0][BOARD_SIZE - 1] == GUIDE)return 10 * (BOARD_SIZE - 1);
+    if(bd->board[BOARD_SIZE - 1][0] == GUIDE)return BOARD_SIZE - 1;
+    if(bd->board[BOARD_SIZE - 1][BOARD_SIZE - 1] == GUIDE)return 10 * (BOARD_SIZE - 1) + (BOARD_SIZE - 1);
+
+    return -1;
 }
